@@ -1,0 +1,41 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Profile {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  displayName String?
+  bio         String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model Episode {
+  id          String         @id @default(uuid())
+  title       String
+  description String?
+  script      String?
+  audioUrl    String?        // Public URL of the generated audio in Supabase Storage
+  duration    Int?           // Duration in seconds
+  status      EpisodeStatus  @default(DRAFT)
+  publishedAt DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime?       @updatedAt
+
+  @@index([createdAt])
+}
+
+enum EpisodeStatus {
+  DRAFT
+  PROCESSING
+  PUBLISHED
+  FAILED
+}
