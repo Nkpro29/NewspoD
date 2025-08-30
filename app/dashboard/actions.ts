@@ -72,10 +72,10 @@ export async function generateEpisodeAudio(formData: FormData) {
       where: { id: episodeId },
       data: { status: "PUBLISHED", publishedAt: new Date() },
     })
-  } catch (e) {
-    console.error(e)
+  } catch (error) {
+    console.error(error)
     await prisma.episode.update({ where: { id: episodeId }, data: { status: "FAILED" } })
-    throw e
+    throw error
   }
 
   revalidatePath("/dashboard")
