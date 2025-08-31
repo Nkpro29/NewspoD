@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
-import { saveProfile, generateEpisodeAudio } from "./actions";
+import { generateEpisodeAudio } from "./actions";
 import {
   Card,
   CardContent,
@@ -9,8 +9,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { AudioPlayer } from "@/components/audio-player";
 import UserAvatar from "@/components/auth/user-avatar";
