@@ -10,7 +10,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { redirect } from "next/navigation";
 import { getServerSupabase } from "@/lib/supabase/server";
-import { prisma } from "@/lib/prisma";
 import { saveProfile } from "../dashboard/actions";
 
 export default async function ProfilePage() {
@@ -23,9 +22,9 @@ export default async function ProfilePage() {
     redirect("/login");
   }
 
-  const profile = await prisma.profile.findUnique({
-    where: { userId: user.id },
-  });
+  // const profile = await prisma.profile.findUnique({
+  //   where: { userId: user.id },
+  // });
   return (
     <>
       <main className="relative min-h-screen w-full bg-gradient-to-br from-gray-950 via-black to-gray-900 text-white">
@@ -51,7 +50,7 @@ export default async function ProfilePage() {
                   <Input
                     id="displayName"
                     name="displayName"
-                    defaultValue={profile?.displayName ?? ""}
+                    defaultValue={""}
                     className="bg-gray-800/70 border-gray-700 text-white"
                   />
                 </div>
@@ -65,7 +64,7 @@ export default async function ProfilePage() {
                   <Textarea
                     id="bio"
                     name="bio"
-                    defaultValue={profile?.bio ?? ""}
+                    defaultValue={""}
                     rows={4}
                     className="bg-gray-800/70 border-gray-700 text-white"
                   />

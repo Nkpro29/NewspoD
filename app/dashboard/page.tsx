@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { getServerSupabase } from "@/lib/supabase/server";
-import { prisma } from "@/lib/prisma";
 import { generateEpisodeAudio } from "./actions";
 import {
   Card,
@@ -12,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { AudioPlayer } from "@/components/audio-player";
 import UserAvatar from "@/components/auth/user-avatar";
+import { SupabaseClient } from "@supabase/supabase-js";
 
 export default async function DashboardPage() {
   const supabase = getServerSupabase();
@@ -57,9 +57,23 @@ export default async function DashboardPage() {
 }
 
 async function EpisodesList() {
-  const episodes = await prisma.episode.findMany({
-    orderBy: { createdAt: "desc" },
-  });
+  const supabase = getServerSupabase();
+  const { data: Episode } = await supabase.from("Episode").select("*");
+
+  const episodes = Episode?.map((episode) => ({
+    id: episode.id,
+    title: episode.title,
+    description: episode.description,
+    createdAt: episode.created_at,
+    duration: episode.duration,
+    audioUrl: episode.audio_url,
+    status:
+      episode.status === "processing"
+        ? "Processing..."
+        : episode.status === "failed"
+        ? "Failed"
+        : "Ready",
+  })) || [];
 
   return (
     <Card className="bg-gray-900/60 border-gray-800 backdrop-blur-md shadow-lg rounded-2xl">
