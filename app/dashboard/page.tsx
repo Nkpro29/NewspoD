@@ -23,9 +23,9 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
-  const profile = await prisma.profile.findUnique({
-    where: { userId: user.id },
-  });
+  // const profile = await prisma.profile.findUnique({
+  //   where: { userId: user.id },
+  // });
 
   return (
     <main className="relative min-h-screen w-full bg-gradient-to-br from-gray-950 via-black to-gray-900 text-white">
@@ -40,7 +40,7 @@ export default async function DashboardPage() {
               Dashboard
             </h1>
             <p className="text-gray-400">
-              Welcome, {profile?.displayName || user.email}
+              Welcome, {user.email}
             </p>
           </div>
           {/* Avatar dropdown */}
