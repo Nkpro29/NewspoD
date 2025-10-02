@@ -10,6 +10,7 @@ datasource db {
 model Profile {
   id          String   @id @default(uuid())
   userId      String   @unique
+  role        userRole @default(USER)
   displayName String?
   bio         String?
   createdAt   DateTime @default(now())
@@ -19,16 +20,16 @@ model Profile {
 }
 
 model Episode {
-  id          String         @id @default(uuid())
+  id          String        @id @default(uuid())
   title       String
   description String?
   script      String?
-  audioUrl    String?        // Public URL of the generated audio in Supabase Storage
-  duration    Int?           // Duration in seconds
-  status      EpisodeStatus  @default(DRAFT)
+  audioUrl    String? // Public URL of the generated audio in Supabase Storage
+  duration    Int? // Duration in seconds
+  status      EpisodeStatus @default(DRAFT)
   publishedAt DateTime?
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime?       @updatedAt
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime?     @updatedAt
 
   @@index([createdAt])
 }
@@ -38,4 +39,9 @@ enum EpisodeStatus {
   PROCESSING
   PUBLISHED
   FAILED
+}
+
+enum userRole {
+  ADMIN
+  USER
 }

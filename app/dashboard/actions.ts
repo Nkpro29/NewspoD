@@ -1,95 +1,105 @@
 "use server";
 
-import { prisma } from "@/lib/prisma";
-import { getServerSupabase } from "@/lib/supabase/server";
-import { play } from "@elevenlabs/elevenlabs-js";
-import { revalidatePath } from "next/cache";
+import Groq from "groq-sdk";
+import { SpeechResult } from "@/lib/types";
+import { createClient as createServerSupabase } from "@/lib/supabase/server";
+import { randomUUID } from "crypto";
+import { createAdminClient } from "@/lib/supabase/admin";
 
-export async function saveProfile(formData: FormData) {
-  const supabase = getServerSupabase();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  if (error || !user) {
-    throw new Error("Unauthorized");
+// Lazy-initialize server-side Supabase client to avoid top-level await issues
+let supabasePromise: ReturnType<typeof createServerSupabase> | null = null;
+async function getSupabase() {
+  if (!supabasePromise) {
+    supabasePromise = createServerSupabase();
   }
-
-  const displayName = (formData.get("displayName") as string | null) || null;
-  const bio = (formData.get("bio") as string | null) || null;
-
-  await supabase
-    .from("Profile")
-    .update({ displayName, bio })
-    .eq("userId", user.id)
-    .select("*");
-
-  revalidatePath("/dashboard");
+  return supabasePromise;
 }
 
-// Generate audio for an episode via ElevenLabs and just play it (no storage)
-export async function generateEpisodeAudio(formData: FormData) {
-  const supabase = getServerSupabase();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
+const groq = new Groq({
+  apiKey: process.env.GROQ_API_KEY,
+});
 
-  if (error || !user) throw new Error("Unauthorized");
+const model = "playai-tts";
+const voice = "Fritz-PlayAI";
+const responseFormat = "wav";
 
-  const episodeId = String(formData.get("episodeId") || "").trim();
-  if (!episodeId) throw new Error("episodeId is required");
-
-  // Fetch episode
-  const { data: episode, error: episodeError } = await supabase
-    .from("Episode")
-    .select("*")
-    .eq("id", episodeId)
-    .single();
-
-  if (episodeError || !episode) throw new Error("Episode not found");
-  if (!episode.script || episode.script.trim().length === 0) {
-    throw new Error("Episode has no script to synthesize");
-  }
-
-  // Update status to PROCESSING
-  await supabase.from("Episode").update({ status: "PROCESSING" }).eq("id", episodeId);
-
-  // ElevenLabs
-  const { ElevenLabsClient } = await import("@elevenlabs/elevenlabs-js");
-  const voiceId = process.env.ELEVENLABS_VOICE_ID || "JBFqnCBsd6RMkjVDRZzb";
-  const modelId = process.env.ELEVENLABS_MODEL_ID || "eleven_multilingual_v2";
-  const outputFormat = (process.env.ELEVENLABS_OUTPUT ||
-    "mp3_44100_128") as any;
-
-  const elevenlabs = new ElevenLabsClient({
-    apiKey: process.env.ELEVENLABS_API_KEY,
+export async function generateSpeech(text: string): Promise<SpeechResult> {
+  // Request TTS audio from Groq and return raw bytes to the caller
+  const response = await groq.audio.speech.create({
+    model,
+    voice,
+    input: text,
+    response_format: responseFormat,
   });
 
-  try {
-    const audio = await elevenlabs.textToSpeech.convert(voiceId, {
-      text: episode.script,
-      modelId,
-      outputFormat,
+  const audio = await response.arrayBuffer();
+
+  return {
+    audio,
+    contentType: "audio/wav",
+    fileName: "speech.wav",
+  };
+}
+
+// Generate speech, upload to Supabase Storage, and return a URL using your deploy domain
+export async function generateAndUploadSpeech(
+  text: string
+): Promise<{ url: string; key: string }> {
+  const response = await groq.audio.speech.create({
+    model,
+    voice,
+    input: text,
+    response_format: responseFormat,
+  });
+
+  const audio = await response.arrayBuffer();
+  const fileBuffer = Buffer.from(audio);
+
+  const bucket = process.env.NEXT_PUBLIC_EPISODES_BUCKET as string;
+  const key = `${randomUUID()}.wav`;
+
+  const admin = createAdminClient();
+
+  const { error: uploadError } = await admin.storage
+    .from(bucket)
+    .upload(key, fileBuffer, {
+      cacheControl: "3600",
+      contentType: "audio/wav",
+      upsert: false,
     });
 
-    // Directly play the generated audio
-    await play(audio);
-
-    // Mark as published
-    await prisma.episode.update({
-      where: { id: episodeId },
-      data: { status: "PUBLISHED", publishedAt: new Date() },
-    });
-  } catch (error) {
-    console.error(error);
-    await prisma.episode.update({
-      where: { id: episodeId },
-      data: { status: "FAILED" },
-    });
-    throw error;
+  if (uploadError) {
+    throw new Error(`Failed to upload audio: ${uploadError.message}`);
   }
 
-  revalidatePath("/dashboard");
+  // ✅ Permanent public URL (works only if bucket is public)
+  const { data } = await admin.storage.from(bucket).getPublicUrl(key);
+
+  return {
+    url: data.publicUrl,
+    key,
+  };
+}
+
+export async function publishAudioUrl(audio_url: string, episodeId: string) {
+  const supabase = await getSupabase();
+
+  try {
+    const { data } = await supabase
+      .from("Episode")
+      .update({
+        audioUrl: audio_url,
+        title: "Local News",
+        description: "This is a Nagpur news podcast.",
+        publishedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        status: "PUBLISHED",
+      })
+      .eq("id", episodeId)
+      .select();
+
+    console.log("published audio url: ", data);
+  } catch (error) {
+    console.error(error);
+  }
 }
