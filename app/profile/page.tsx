@@ -9,11 +9,11 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { redirect } from "next/navigation";
-import { getServerSupabase } from "@/lib/supabase/server";
-import { saveProfile } from "../dashboard/actions";
+import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
+import { saveProfile } from "./actions";
 
 export default async function ProfilePage() {
-  const supabase = getServerSupabase();
+  const supabase = await createServerSupabaseClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
